@@ -1,0 +1,21 @@
+{
+  "name": "cctalk",
+  "version": "0.1.1",
+  "description": "Interface coin acceptors and other hardware speaking ccTalk",
+  "keywords": ["serial", "usb", "money", "coins", "hardware", "cctalk"],
+  "email": "lukas@polyxo.de",
+  "author": "Lukas Winter",
+  "main": "cctalk.js",
+  "dependencies": {
+    "defaults-deep": "^0.2.3",
+    "promise": "^7.1.1",
+    "promise-timeout": "^1.0.0",
+    "serialport": "^4.0.1"
+  },
+  "license" : "BSD-2-Clause",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/Polyxo/node-cctalk.git"
+  }
+}
