@@ -30,8 +30,8 @@
           socket.emit(msg.cmd,{ from: 'cardreader-acr122u', tag: msg.tag })
           //console.log('ALLAH', msg)
         }
+      }
     }
-
     function applyHandler(){
       for (const id in cluster.workers) {
         cluster.workers[id].on('message', messageHandler);
