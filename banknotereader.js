@@ -127,8 +127,7 @@ var CCCommand = ccTalkMessage;
 */
 var CCDeviceEmitter = compose(CCDevice, EventEmitter);
 
-function BanknoteReader(bus, config)
-{
+function BanknoteReader(bus, config) {
   EventEmitter.call(this);
   CCDevice.apply(this, arguments);
 
@@ -144,9 +143,31 @@ BanknoteReader.prototype = new CCDeviceEmitter();
 BanknoteReader.prototype.onBusReady = function onBusReady() {
   var COMMAND = new CCCommand(this.config.src, this.config.dest, 254, new Uint8Array(0),16)
   this.sendCommand(COMMAND)
-    .then(function() {
+    .then(function (answer) {
+      console.log(answer)
+      if (answer.command === 0) {
+        return answer
+      } else {
+        throw "WORINGANSWER"
+      }
+    })
+
+    this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.performSelfCheck, new Uint8Array(0),16))
+    .then(function(answer) {
+      console.log(answer)
+      //this.ready = true;
+      //this.pollInterval = setInterval(this.poll, 900);
+      //this.emit('ready');
+    }.bind(this), function(error) {
+      this.emit('error', error);
+    }.bind(this));
+
+
+    this.sendCommand(new CCCommand(this.config.src, this.config.dest, 153, new Uint8Array(0),16))
+    .then(function(answer) {
+      console.log(answer)
       this.ready = true;
-      this.pollInterval = setInterval(this.poll, 200);
+      this.pollInterval = setInterval(this.poll, 900);
       this.emit('ready');
     }.bind(this), function(error) {
       this.emit('error', error);
@@ -196,20 +217,53 @@ BanknoteReader.prototype.poll = function poll() {
   }.bind(this));
 };
 
-BanknoteReader.prototype.setAcceptanceMask = function setAcceptanceMask(acceptanceMask)
-{
-  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyInhibitStatus,
-                                        Uint8Array.from([ acceptanceMask & 0xFF, (acceptanceMask >> 8) & 0xFF ]),16))
-    .catch(function(e)
-    {
+BanknoteReader.prototype.client = function modifyBillOperatingMode(cmd,data){
+  // 0 0 , stacker, escrow
+  if (!data) {
+    data = new Uint8Array(0)
+  }
+  if (typeof cmd === 'string'){
+    cmd = BanknoteReader.commands[cmd]
+  }
+
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, cmd,
+                                        data,16))
+    .catch(function(e) {
       this.emit('error', e);
       throw e;
     }.bind(this));
 };
 
-BanknoteReader.prototype.enableAcceptance = function enableAcceptance()
-{
-  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, new Uint8Array(1).fill(0xFF),16))
+BanknoteReader.prototype.modifyBillOperatingMode = function modifyBillOperatingMode(operatingMode){
+  // 0 0 , stacker, escrow
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyInhibitStatus,
+                                        Uint8Array.from([ operatingMode & 0xFF, (operatingMode >> 8) & 0xFF ]),16))
+    .catch(function(e) {
+      this.emit('error', e);
+      throw e;
+    }.bind(this));
+};
+
+BanknoteReader.prototype.setAcceptanceMask = function setAcceptanceMask(acceptanceMask){
+  // example:   231  255  255
+  //all-> 231 255 1 0 0 0 0 0 0
+  // Uint8Array.from([ acceptanceMask & 0xFF, (acceptanceMask >> 8) & 0xFF ]) == Uint8Array [ 255, 255 ]
+  //
+  if (!acceptanceMask) {
+    acceptanceMask = 0xFFFF
+  }
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyInhibitStatus,
+                                        new Uint8Array([255, 1]),16))
+    .catch(function(e) {
+      this.emit('error', e);
+      throw e;
+    }.bind(this));
+};
+
+BanknoteReader.prototype.enableAcceptance = function enableAcceptance(){
+  //228  001
+  //_> new Uint8Array(1).fill(0xFF) == Uint8Array [ 255 ] new Buffer(1).from([255]) new Buffer.from([255,255]).readUInt8()
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, new Buffer.from([1]),16))
     .catch(function(e)
     {
       this.emit('error', e);
@@ -227,8 +281,7 @@ BanknoteReader.prototype.selfTest = function selfTest() {
 };
 
 
-BanknoteReader.prototype.disableAcceptance = function disableAcceptance()
-{
+BanknoteReader.prototype.disableAcceptance = function disableAcceptance() {
   return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, new Uint8Array(1).fill(0x00),16))
     .catch(function(e)
     {
@@ -237,8 +290,7 @@ BanknoteReader.prototype.disableAcceptance = function disableAcceptance()
     }.bind(this));
 };
 
-BanknoteReader.prototype.getCoinName = function getCoinName(channel)
-{
+BanknoteReader.prototype.getCoinName = function getCoinName(channel) {
   return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.requestCoinId,
                                         Uint8Array.from([ channel ]),16))
   .then(function(reply)
@@ -247,14 +299,12 @@ BanknoteReader.prototype.getCoinName = function getCoinName(channel)
   }.bind(this));
 };
 
-BanknoteReader.prototype.getCoinPosition = function getCoinPosition(channel)
-{
+BanknoteReader.prototype.getCoinPosition = function getCoinPosition(channel) {
   return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.requestCoinPosition,
                                         Uint8Array.from([ channel ]),16));
 };
 
-BanknoteReader.commands =
-{
+BanknoteReader.commands = {
   requestStatus: 248,
   requestVariableSet: 247,
   requestManufacturerId: 246,
@@ -272,7 +322,8 @@ BanknoteReader.commands =
   modifyInhibitStatus: 231,
   requestInhibitStatus: 230,
   readBufferedBill: 159, //Bill Validator commands
-  modifyMasterInhibit: 228,
+  modifyBillOperatingMode: 153, //Bill Validator commands 000
+  modifyMasterInhibit: 228, // 228  000
   requestMasterInhibitStatus: 227,
   requestInsertionCounter: 226,
   requestAcceptCounter: 225,
@@ -298,12 +349,17 @@ BanknoteReader.commands =
   requestBaseYear: 170,
   requestAddressMode:169,
   /*
+  231  255  255
+  228  001
+
   158 Modify bill id //Bill Validator commands
-  157 Request bill id //Bill Validator commands
+  157 Request bill id //Bill Validator commands  157  001
   156 Request country scaling factor //Bill Validator commands
   155 Request bill position //Bill Validator commands
   154 Route bill //Bill Validator commands
+
   153 Modify bill operating mode //Bill Validator commands
+
   152 Request bill operating mode //Bill Validator commands
   151 Test lamps //Bill Validator commands //Changer / Escrow commands
   150 Request individual accept counter //Bill Validator commands

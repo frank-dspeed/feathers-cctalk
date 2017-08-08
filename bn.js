@@ -17,10 +17,13 @@
   br.on('ready', function() {
     try {
       console.log('jmcReady-ready');
-
+      //br.setAcceptanceMask(0xFFFF); //modifyInhibitStatus 255,255 // 255 1 0 0 0 0 0 0
       //br.selfTest();
-      //br.enableAcceptance();
-      br.setAcceptanceMask(0xFFFF);
+      //setTimeout(()=>{
+        //  br.enableAcceptance(); // modifyMasterInhibit 1
+
+      //},5000)
+      //br.enableAcceptance(); // modifyMasterInhibit 1
 
       br.on('error', function(e) { console.log('error', e); });
       br.on('accepted', function(c) {
@@ -45,3 +48,7 @@
       console.log(e, e.stack);
     }
   });
+
+  br.client( 231 ,new Uint8Array([255, 1, 0, 0, 0, 0, 0, 0])).then((s)=>console.log('SSSSSSSSSSSS: ',s))
+  br.client( 228 ,new Uint8Array([1])).then((s)=>console.log('SSSSSSSSSSSS: ',s))
+    br.client( 227 ,new Uint8Array([1])).then((s)=>console.log('GGGGGGGG: ',s))

@@ -119,14 +119,11 @@ CCBus.prototype = {
     }
   },
 
-  sendRawCommand: function sendCommand(command)
-  {
-    return new Promise(function(resolve, reject)
-    {
+  sendRawCommand: function sendCommand(command) {
+    return new Promise(function(resolve, reject) {
       //console.log("will send command");
       command.src = this.config.src;
-      this.ser.write(command.toBuffer(), function(err)
-      {
+      this.ser.write(command.toBuffer(), function(err) {
         //console.log("have sent command");
         if(err)
           return reject(err);
@@ -135,23 +132,26 @@ CCBus.prototype = {
     }.bind(this));
   },
 
-  sendCommand: function sendCommand(command)
-  {
+  sendCommand: function sendCommand(command) {
     // Send command with promised reply
     // If you use this function, use it exclusively and don't forget to call _onData() if you override onData()
 
-    var promise = timeout(new Promise(function(resolve, reject)
-    {
+    var promise = timeout(new Promise(function(resolve, reject) {
       command.resolve = resolve;
       command.reject = reject;
-    }.bind(this)), this.config.timeout);
+    }.bind(this)), this.config.timeout).catch(function (err) {
+      if (err instanceof timeout) {
+        console.error('Timeout :-(',command);
+      } else {
+        console.log(err)
+      }
+    });
 
     // use the command chain to send command only when previous commands have finished
     // this way replies can be correctly attributed to commands
     this.commandChainPromise = this.commandChainPromise
-    .catch(function() {})
-    .then(function()
-    {
+    .catch(debug)
+    .then(function() {
       this.lastCommand = command;
       return this.sendRawCommand(command);
     }.bind(this))
