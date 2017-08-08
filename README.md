@@ -1,9 +1,10 @@
+https://cctalktutorial.wordpress.com/2015/09/22/cctalk-tutorial-testing-some-more-usefull-headers-part-2-or-hello-cctalk-bill-acceptor/
 Node Library to interface coin detectors and other peripheral devices speaking the ccTalk protocol
 ==================================================================================================
 
 This library aims to provide support for various peripheral devices that use the ccTalk protocol
 over a serial line or serial line emulation over USB. It's primary target is the EMP800 by
-wh Münzprüfer Berlin. 
+wh Münzprüfer Berlin.
 
 At the moment this is very much a work in progress.
 

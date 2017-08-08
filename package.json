@@ -1,21 +1,33 @@
 {
-  "name": "cctalk",
-  "version": "0.1.1",
+  "name": "cctalk-devices",
+  "version": "0.1.2",
   "description": "Interface coin acceptors and other hardware speaking ccTalk",
-  "keywords": ["serial", "usb", "money", "coins", "hardware", "cctalk"],
-  "email": "lukas@polyxo.de",
-  "author": "Lukas Winter",
-  "main": "cctalk.js",
+  "keywords": [
+    "serial",
+    "usb",
+    "money",
+    "coins",
+    "hardware",
+    "cctalk"
+  ],
+  "email": "frank@dspeed.eu",
+  "author": "Frank Lemanschik",
+  "main": "cctalk-devices.js",
   "dependencies": {
+    "cctalk-message": "git+https://github.com/direktspeed/cctalk-message.git#master",
     "defaults-deep": "^0.2.3",
     "promise": "^7.1.1",
     "promise-timeout": "^1.0.0",
-    "serialport": "^4.0.1"
+    "serialport": "^4.0.7"
   },
-  "license" : "BSD-2-Clause",
-  "repository":
-  {
+  "scripts": {
+    "deploy": "rsync -avzh --exclude-from='./RSYNC_EXCLUDES' ./ markus:/srv/drivers/cctalk-devices && ssh markus scp -r /srv/drivers/cctalk-devices pi@showclient-1:/home/pi",
+    "start": "node .",
+    "debug": "DEBUG=* node ."
+  },
+  "license": "BSD-2-Clause",
+  "repository": {
     "type": "git",
-    "url": "https://github.com/Polyxo/node-cctalk.git"
+    "url": "https://github.com/direktspeed/node-cctalk-devices.git"
   }
 }

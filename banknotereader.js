@@ -1,9 +1,130 @@
 var Promise = require('promise');
-var CCCommand = require('./cctalk-message');
+var CCCommand = require('cctalk-message');
 var CCDevice = require('./device');
 var EventEmitter = require('events');
 var compose = require('./compose');
 
+const debug = require('debug');
+const crc = require('crc')
+/*
+class ccTalkMessage {
+  // src, dest, command, data, crc
+  constructor(src, dest, command, data, crc) {
+    //fromBuffer() A buffer always should have a crc checksum already !
+    if(src instanceof Uint8Array) {
+      // parse command
+      this._buffer = src;
+      this._src = this._buffer[2];
+      this._dest = this._buffer[0];
+      this._command = this._buffer[3];
+      this._data = this._buffer.slice(4, this._buffer[1]+4);
+      // TODO: checksum detection and parsing
+      this._checksum = this._buffer[this._buffer[1]+4]
+
+      if (this._checksum == undefined) {
+          console.log(this._buffer)
+          throw new Error('NO_CHECKSUM');
+      } else {
+        // Check for CRC8
+        if (this.crc8verify()) {
+          this._crcType = 8
+          debug('ccMessage:crc')('CRC8_CHECKSUM')
+        } else if (this.crc16verify()) {
+          this._crcType = 16
+          debug('ccMessage:crc')('CRC16_CHECKSUM')
+        } else {
+          debug('ccMessage:crc')(this._buffer)
+          throw new Error('WRONG_CHECKSUM');
+        }
+      }
+
+    } else {
+      // create command
+      if (command == undefined) {
+          debug('ccMessage:command')(this._buffer)
+          throw new Error('NO_COMMAND');
+      } else if (data == undefined) {
+          debug('ccMessage:command')(this._buffer)
+          throw new Error('NO_DATA');
+      }
+      this._src = typeof src != undefined ? src : 1;
+      this._dest = typeof dest != undefined ? dest : 2;
+      this._crcType = typeof crc != undefined ? crc : 8
+      this._command = command;
+      this._data = data;
+    }
+  }
+  toBuffer() {
+    if (this._buffer == undefined) {
+      this._buffer = new Uint8Array(5 + this._data.length);
+      this._buffer[0] = this._dest;
+      this._buffer[1] = this._data.length;
+      this._buffer[2] = this._src;
+      this._buffer[3] = this._command;
+      this._buffer.set(this._data, 4);
+      // console.log('CRC: ', this._crcType)
+      if (this._crcType === 8) {
+        return this.crc8()
+      } else {
+        return this.crc16()
+      }
+    } else {
+      return this._buffer
+    }
+  }
+  crc8() {
+    var sum = 0;
+    for (var i=0; i < (this._buffer.length - 1); ++i)
+      sum += (this._buffer[i]);
+    // Set Checksum at end
+    this._buffer[this._data.length+4] = 0x100 - sum%0x100;
+    return this._buffer;
+  }
+  crc8verify() {
+    var sum = 0;
+    for (var i=0; i < (this._buffer.length - 1); ++i) {
+      sum += (this._buffer[i]);
+    }
+
+    if (this._buffer[this._data.length+4] != 0x100 - sum%0x100) {
+      return false;
+    } else {
+      return true
+    }
+  }
+  crc16() {
+    //CRC16-CCITT-xModem signed Buffer
+    var UArray = new Uint8Array([this._buffer[0],this._buffer[1],this._buffer[3]])
+    var CRCArray = require('crc').crc16xmodem(Buffer.from(UArray))
+        .toString(16)
+        .match(/.{1,2}/g)
+        .map((val)=> parseInt(val, 16))
+        .reverse()
+    // console.log(CRCArray)
+    // Set Checksum first Part at src
+    this._buffer.set([CRCArray[0]],2)
+    // Set Checksum Secund Part after data
+    this._buffer.set([CRCArray[1]], this._buffer[1]+4) // Position after data aka last
+    return this._buffer;
+  }
+  crc16verify() {
+    var UArray = new Uint8Array([this._buffer[0],this._buffer[1],this._buffer[3]])
+    var CRCArray = require('crc').crc16xmodem(Buffer.from(UArray))
+        .toString(16)
+        .match(/.{1,2}/g)
+        .map((val)=> parseInt(val, 16))
+        .reverse();
+
+    if ((this._buffer[2] == CRCArray[0]) && (this._buffer[this._buffer[1]+4] == CRCArray[1])) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
+var CCCommand = ccTalkMessage;
+*/
 var CCDeviceEmitter = compose(CCDevice, EventEmitter);
 
 function BanknoteReader(bus, config)
@@ -20,32 +141,25 @@ function BanknoteReader(bus, config)
 
 BanknoteReader.prototype = new CCDeviceEmitter();
 
-BanknoteReader.prototype.onBusReady = function onBusReady()
-{
-  this.sendCommand(new CCCommand(this.config.src, this.config.dest, 254, new Uint8Array(0),16))
-    .then(function()
-    {
+BanknoteReader.prototype.onBusReady = function onBusReady() {
+  var COMMAND = new CCCommand(this.config.src, this.config.dest, 254, new Uint8Array(0),16)
+  this.sendCommand(COMMAND)
+    .then(function() {
       this.ready = true;
       this.pollInterval = setInterval(this.poll, 200);
       this.emit('ready');
-    }.bind(this),
-    function(error)
-    {
+    }.bind(this), function(error) {
       this.emit('error', error);
     }.bind(this));
-
 };
 
-BanknoteReader.prototype.onBusClosed = function onBusClosed()
-{
+BanknoteReader.prototype.onBusClosed = function onBusClosed() {
   this.ready = false;
 };
 
-BanknoteReader.prototype.poll = function poll()
-{
-  this.sendCommand(new CCCommand(0, 0, BanknoteReader.commands.readBufferedCredit, new Uint8Array(0),16))
-  .then(function(reply)
-  {
+BanknoteReader.prototype.poll = function poll() {
+  this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.readBufferedBill, new Uint8Array(0),16))
+  .then(function(reply) {
     if(this.eventBuffer && reply.data[0] != this.eventBuffer[0])
     {
       var dEventCounter = reply.data[0] -  this.eventBuffer[0];
@@ -84,7 +198,7 @@ BanknoteReader.prototype.poll = function poll()
 
 BanknoteReader.prototype.setAcceptanceMask = function setAcceptanceMask(acceptanceMask)
 {
-  return this.sendCommand(new CCCommand(0, 0, BanknoteReader.commands.modifyInhibitStatus,
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyInhibitStatus,
                                         Uint8Array.from([ acceptanceMask & 0xFF, (acceptanceMask >> 8) & 0xFF ]),16))
     .catch(function(e)
     {
@@ -95,7 +209,7 @@ BanknoteReader.prototype.setAcceptanceMask = function setAcceptanceMask(acceptan
 
 BanknoteReader.prototype.enableAcceptance = function enableAcceptance()
 {
-  return this.sendCommand(new CCCommand(0, 0, BanknoteReader.commands.modifyMasterInhibit, new Uint8Array(1).fill(0xFF),16))
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, new Uint8Array(1).fill(0xFF),16))
     .catch(function(e)
     {
       this.emit('error', e);
@@ -103,9 +217,19 @@ BanknoteReader.prototype.enableAcceptance = function enableAcceptance()
     }.bind(this));
 };
 
+
+BanknoteReader.prototype.selfTest = function selfTest() {
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, 232, new Uint8Array(0),16))
+    .catch(function(e) {
+      this.emit('error', e);
+      throw e;
+    }.bind(this));
+};
+
+
 BanknoteReader.prototype.disableAcceptance = function disableAcceptance()
 {
-  return this.sendCommand(new CCCommand(0, 0, BanknoteReader.commands.modifyMasterInhibit, new Uint8Array(1).fill(0x00),16))
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, new Uint8Array(1).fill(0x00),16))
     .catch(function(e)
     {
       this.emit('error', e);
@@ -115,7 +239,7 @@ BanknoteReader.prototype.disableAcceptance = function disableAcceptance()
 
 BanknoteReader.prototype.getCoinName = function getCoinName(channel)
 {
-  return this.sendCommand(new CCCommand(0, 0, BanknoteReader.commands.requestCoinId,
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.requestCoinId,
                                         Uint8Array.from([ channel ]),16))
   .then(function(reply)
   {
@@ -125,7 +249,7 @@ BanknoteReader.prototype.getCoinName = function getCoinName(channel)
 
 BanknoteReader.prototype.getCoinPosition = function getCoinPosition(channel)
 {
-  return this.sendCommand(new CCCommand(0, 0, BanknoteReader.commands.requestCoinPosition,
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.requestCoinPosition,
                                         Uint8Array.from([ channel ]),16));
 };
 
@@ -147,7 +271,7 @@ BanknoteReader.commands =
   performSelfCheck: 232,
   modifyInhibitStatus: 231,
   requestInhibitStatus: 230,
-  readBufferedCredit: 229,
+  readBufferedBill: 159, //Bill Validator commands
   modifyMasterInhibit: 228,
   requestMasterInhibitStatus: 227,
   requestInsertionCounter: 226,
@@ -173,15 +297,47 @@ BanknoteReader.commands =
   requestThermistorReading: 173,
   requestBaseYear: 170,
   requestAddressMode:169,
+  /*
+  158 Modify bill id //Bill Validator commands
+  157 Request bill id //Bill Validator commands
+  156 Request country scaling factor //Bill Validator commands
+  155 Request bill position //Bill Validator commands
+  154 Route bill //Bill Validator commands
+  153 Modify bill operating mode //Bill Validator commands
+  152 Request bill operating mode //Bill Validator commands
+  151 Test lamps //Bill Validator commands //Changer / Escrow commands
+  150 Request individual accept counter //Bill Validator commands
+  149 Request individual error counter //Bill Validator commands
+  148 Read opto voltages //Bill Validator commands
+  147 Perform stacker cycle //Bill Validator commands
+  146 Operate bi-directional motors //Bill Validator commands //Changer / Escrow commands
+  145 Request currency revision //Bill Validator commands
+  144 Upload bill tables //Bill Validator commands
+  143 Begin bill table upgrade //Bill Validator commands
+  142 Finish bill table upgrade //Bill Validator commands
+  141 Request firmware upgrade capability //Bill Validator commands //Changer / Escrow commands
+  140 Upload firmware //Bill Validator commands //Changer / Escrow commands
+  139 Begin firmware upgrade //Bill Validator commands //Changer / Escrow commands
+  138 Finish firmware upgrade //Bill Validator commands //Changer / Escrow commands
+  */
   requestCommsRevision: 4,
   clearCommsStatusVariables: 3,
   requestCommsStatusVariables: 2,
   resetDevice: 1
 };
 
+
+
+
+
+
+
+
+
+
 BanknoteReader.eventCodes =
 {
-  254: 'return',
+ //Core Plus commands  254: 'return',
   20: 'string',
   19: 'slow',
   13: 'busy',
