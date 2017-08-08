@@ -253,7 +253,7 @@ BanknoteReader.prototype.setAcceptanceMask = function setAcceptanceMask(acceptan
     acceptanceMask = 0xFFFF
   }
   return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyInhibitStatus,
-                                        new Uint8Array([255, 1]),16))
+                                        new Uint8Array(0),16))
     .catch(function(e) {
       this.emit('error', e);
       throw e;
@@ -263,7 +263,7 @@ BanknoteReader.prototype.setAcceptanceMask = function setAcceptanceMask(acceptan
 BanknoteReader.prototype.enableAcceptance = function enableAcceptance(){
   //228  001
   //_> new Uint8Array(1).fill(0xFF) == Uint8Array [ 255 ] new Buffer(1).from([255]) new Buffer.from([255,255]).readUInt8()
-  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, new Buffer.from([1]),16))
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, BanknoteReader.commands.modifyMasterInhibit, Buffer.from([]),16))
     .catch(function(e)
     {
       this.emit('error', e);
@@ -273,7 +273,7 @@ BanknoteReader.prototype.enableAcceptance = function enableAcceptance(){
 
 
 BanknoteReader.prototype.selfTest = function selfTest() {
-  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, 232, new Uint8Array(0),16))
+  return this.sendCommand(new CCCommand(this.config.src, this.config.dest, 232, Buffer.from([]),16))
     .catch(function(e) {
       this.emit('error', e);
       throw e;
