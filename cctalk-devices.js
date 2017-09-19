@@ -1,172 +1,153 @@
+//TODO: Move FUnctions for toCoin Calls into messageHandler to Reduce Debug Output
+const util = require('util');
+const makeDebug = require('debug');
+const config = require('./config');
 
-  function toCoins(name) {
-    //'EU200A'
-    coins = name.replace('EU','').replace('00A','');
-    coins = parseInt(coins);
-    return coins
-  }
-  //const io = require('socket.io-client/dist/socket.io.js');
+const cctalk = require('./lib/cctalk');
+const CCBus = require('./cctalk-bus');
 
-  const cluster = require('cluster');
-  const util = require('util');
-  const debug = require('debug')('DRIVER::CCTALK::')
+const WEBSOCKET_SERVER_ADDRESS = config.server;
+const io = require('socket.io-client');
+const socket = io(WEBSOCKET_SERVER_ADDRESS);
 
-  if(cluster.isMaster) {
-    const WEBSOCKET_SERVER_ADDRESS = 'http://master.peep:3030'
-    const io = require('socket.io-client');
-    const socket = io(WEBSOCKET_SERVER_ADDRESS);
+const feathers = require('feathers-client');
+const socketio = require('feathers-socketio/client');
 
-    var CCTALK_MESSAGE = { name: ''}
+const feathersClient = feathers()
+  .configure(socketio(socket, { timeout: 2000 })); //,  {  transports: ['websocket'] }
+  //.configure(hooks())
 
-    function messageHandler(msg) {
-      if (msg.cmd && msg.cmd === 'CCTALK') {
-        //socket.emit('nfcTag',msg.tag.buffer)
-        debug('CCTALK_IN:', msg)
-        // When CCTALK_MESSAGE is not Updated
-        if (CCTALK_MESSAGE.name !== msg.name) {
+var CCTalkStatusService = feathersClient.service('cctalk');
 
-          debug('SET CCTALK_MESSAGE:',CCTALK_MESSAGE,' -> ', msg)
-          CCTALK_MESSAGE = msg;
-          socket.emit(msg.cmd,{ from: 'cardreader-acr122u', tag: msg.tag })
-          //console.log('ALLAH', msg)
-        }
-      }
-    }
-    function applyHandler(){
-      for (const id in cluster.workers) {
-        cluster.workers[id].on('message', messageHandler);
-      }
-    }
+const jobsService = feathersClient.service('jobs');
 
-    socket.on('connect', ()=>{
-      debug(' nfcDriver: successful Connected to:', WEBSOCKET_SERVER_ADDRESS + ' '+new Date())
-      // Log Connected to Server
-      socket.emit('CCTALK',CCTALK_MESSAGE)
-    });
+const Queue = require('bee-queue');
 
-    socket.on('TEST',()=>{
-      CCTALK_MESSAGE = { from: 'cardreader-acr122u-test', CLIENT_IP: '192.168.0.33', tag: { buffer: new Buffer('HAHAHA') } };
-      socket.emit('CCTALK',CCTALK_MESSAGE)
-    })
-
-    socket.on('CCTALK_STATUS',()=>{
-      socket.emit('event',{
-        type: 'driver',
-        name: 'CCTALK_STATUS',
-        data: CCTALK_MESSAGE
-      })
-    })
-
-    socket.on('disconnect', function(){
-      debug(new Date(),'nfcDriver: Disconnected from:', WEBSOCKET_SERVER_ADDRESS)
-      // Log Connected to Server
-    });
-
-    cluster.on('online', function(worker) {
-      //console.log('Worker ' + worker.process.pid + ' is online');
-    });
-
-    cluster.on('exit', function(worker, code, signal) {
-        //console.log('Worker ' + worker.process.pid + ' died with code: ' + code + ', and signal: ' + signal);
-        //console.log('Starting a new worker');
-        //setTimeout(()=>
-        cluster.fork()
-        //,5000)
-        applyHandler()
-    });
-    cluster.fork();
-    // CCTALK messageHandler
+const cd_queue = new Queue(config.channel+'/cd',config);
+const br_queue = new Queue(config.channel+'/br',config);
 
 
+var Status = {
+  config,
+  br: 'offline',
+  cd: 'offline'
+};
 
-  } else {
+var MESSAGE = { status: ''};
 
-  var cctalk = require('./cctalk')
-  var CCBus = new cctalk.CCBus('/dev/ttyUSB0')
+function toCoins(name,DEVICE) {
+  //'EU200A'
+  var coin;
+  coin = name.replace('EU','').replace('00A','');
+  coin = parseInt(coin);
+  makeDebug('CCTALK::NOTICE::'+DEVICE)('Transformed',name, coin);
+  return coin;
+}
+//const io = require('socket.io-client/dist/socket.io.js');
+
+function messageHandler(msg) {
+  msg.date = new Date().toISOString();
+  msg.channel = config.channel;
+  MESSAGE = msg;
+  makeDebug('CCTALK::NOTICE::'+msg.status)(MESSAGE);
+  CCTalkStatusService.create(msg);
+}
+
+if (config.cd) {
   var cd = new cctalk.CoinDetector(CCBus, { dest: 2 });
 
   cd.on('error', function(e) {
-    process.send({ cmd: 'CCTALK', name: 'error', type: 'driver', err: e, stack: e.stack });
+    Status.cd = 'error';
+    Status.error = e;
+    messageHandler({ from: 'coindetector', status: 'error', err: e, stack: e.stack });
+  });
+
+  cd.on('accepted', function(coin) {
+    makeDebug('CCTALK::NOTICE::COINDETECTOR')('Accepted',coin);
+    cd.getCoinName(coin).then(function(name) {
+      var amount = toCoins(name,'COINDETECTOR');
+      messageHandler({ from: 'coindetector', status: 'accepted', amount, name, coin });
+    });
+  });
+  cd.on('inhibited', function(coin) {
+    makeDebug('CCTALK::NOTICE::COINDETECTOR')('Inhibited',coin);
+    cd.getCoinName(coin).then(function(name) {
+      var amount = toCoins(name, 'COINDETECTOR');
+      messageHandler({ from: 'coindetector', status: 'inhibited', amount, name, coin });
+      //CCTalkStatusService.create(('INSERTED_COINS', { from: 'coindetector', amount: coin });
+    });
+  });
+  cd.on('rejected', function(coin) {
+    messageHandler({ from: 'coindetector', status: 'rejected', coin });
   });
 
   cd.on('ready', function() {
+    Status.cd = 'ready';
+    cd_queue.process(((job,done)=>{
+      return done('Not Implamented', job);
+    }));
     try {
-      console.log('emp800-ready');
+      makeDebug('CCTALK')('emp800-ready');
       cd.enableAcceptance();
       cd.setAcceptanceMask(0xFFFF);
-
-      cd.on('error', function(e) {
-        process.send({ cmd: 'CCTALK', name: 'error', type: 'driver', err: e, stack: e.stack });
-      });
-      cd.on('accepted', function(c) {
-        console.log('Accepted', c);
-        cd.getCoinName(c).then(function(name) {
-          var coins = toCoins(name)
-          console.log(name, coins);
-          process.send({ cmd: 'CCTALK', name: 'accepted', type: 'driver', amount: coins, HEX: name, C: c });
-        });
-      });
-      cd.on('inhibited', function(c) {
-        console.log('Inhibited', c);
-        cd.getCoinName(c).then(function(name) {
-          var coins = toCoins(name)
-          console.log(name, coins);
-          process.send({ cmd: 'CCTALK', name: 'inhibited', type: 'driver', amount: coins, HEX: name, C: c });
-          //socket.emit('INSERTED_COINS', { from: 'emp800', amount: coins });
-        });
-      });
-      cd.on('rejected', function(c) {
-        process.send({ cmd: 'CCTALK', name: 'rejected', type: 'driver', c: c });
-      });
+      messageHandler({ from: 'coindetector', status: 'ready' });
     }
     catch(e) {
-      process.send({ cmd: 'CCTALK', name: 'error', type: 'driver', err: e, stack: e.stack });
+      Status.cd = 'error';
+      Status.error = e;
+      makeDebug('CCTALK::ERR::COINDETECTOR')(e);
+      messageHandler({ from: 'coindetector', status: 'error', err: e, stack: e.stack });
     }
   });
+}
 
+if (config.br) {
   var br = new cctalk.BanknoteReader(CCBus,{ src: 1, dest: 40 });
   br.on('error', function(e) {
-    process.send({ cmd: 'CCTALK', name: 'error', type: 'driver', err: e, stack: e.stack });
+    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('ERR',e);
+    messageHandler({ from: 'banknotereader', status: 'error', err: e, stack: e.stack });
   });
 
+  br.on('accepted', function(note) {
+    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('Accepted',note);
+    //TODO: Needs Check
+    //br.getNoteName(note).then(function(name) {
+      /*var amount = toCoins(name,'BANKNOTEREADER');
+      switch(note) {
+        case 1:
+        case 2:
+      }
+      */
+      messageHandler({ from: 'banknotereader', status: 'accepted', amount, name, note });
+    //});
+  });
+  br.on('inhibited', function(note) {
+    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('Inhibited',note);
+  //  br.getNoteName(note).then(function TransformNameToCoins(name) {
+      //var amount = toCoins(name,'BANKNOTEREADER');
+      messageHandler({ from: 'banknotereader', status: 'inhibited', amount, name, note });
+  //  });
+  });
+  br.on('rejected', function(note) {
+    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('Rejected',note);
+    messageHandler({ from: 'banknotereader', status: 'rejected', note });
+  });
+
+
   br.on('ready', function() {
+    Status.br = 'ready';
     try {
-      console.log('jmcReady-ready');
-
+      makeDebug('CCTALK')('jmcReady-ready');
       //br.selfTest();
-      //br.enableAcceptance();
-      //TODO: Needs Check
-      br.setAcceptanceMask(0xFFFF);
-
-      br.on('error', function(e) {
-        console.log('error', e);
-      });
-      br.on('accepted', function(c) {
-        console.log('Accepted', c);
-        //TODO: Needs Check
-        br.getNoteName(c).then(function(name) {
-          var coins = toCoins(name)
-          console.log(name, coins);
-          process.send({ cmd: 'CCTALK', name: 'accepted', type: 'driver', amount: coins, HEX: name, C: c });
-        });
-      });
-      br.on('inhibited', function(c) {
-        console.log('Inhibited', c);
-        br.getNoteName(c).then(function(name) {
-          var coins = toCoins(name)
-          console.log(name, coins);
-          process.send({ cmd: 'CCTALK', name: 'inhibited', type: 'driver', amount: coins, HEX: name, C: c });
-          //socket.emit('INSERTED_COINS', { from: 'emp800', amount: coins });
-        });
-      });
-      br.on('rejected', function(c) {
-        //console.log('Rejected', c);
-        process.send({ cmd: 'CCTALK', name: 'rejected', type: 'driver', c: c });
-      });
-
+      br_queue.process(((job,done)=>{
+        return done('Not Implamented', job);
+      }));
+      br.modifyBillOperatingMode();
+      br.setAcceptanceMask(); // 0xFFFF modifyInhibitStatus 255,255 // 255 1 0 0 0 0 0 0 //TODO: Needs Check  br.setAcceptanceMask(0xFFFF);
+      br.enableAcceptance(); // modifyMasterInhibit 1
     }
-    catch(e) {
-      process.send({ cmd: 'CCTALK', name: 'error', type: 'driver', err: e, stack: e.stack });
+    catch(err) {
+      messageHandler({ from: 'banknotereader-trycatch', status: 'error', err, stack: err.stack });
     }
   });
 }

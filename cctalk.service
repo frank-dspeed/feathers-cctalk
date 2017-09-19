@@ -1,0 +1,14 @@
+[Service]
+ExecStart=/usr/bin/node /srv/drivers/cctalk-devices/index.js
+WorkingDirectory=/srv/drivers/cctalk-devices/
+Restart=always
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=cctalk
+User=root
+Group=root
+Environment=NODE_ENV=development
+#Environment=DEBUG=*
+
+[Install]
+WantedBy=multi-user.target

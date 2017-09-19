@@ -12,16 +12,18 @@
   ],
   "email": "frank@dspeed.eu",
   "author": "Frank Lemanschik",
-  "main": "cctalk-devices.js",
+  "main": "index.js",
   "dependencies": {
     "cctalk-message": "git+https://github.com/direktspeed/cctalk-message.git#master",
     "defaults-deep": "^0.2.3",
+    "feathers-client": "^2.3.0",
     "promise": "^7.1.1",
     "promise-timeout": "^1.0.0",
-    "serialport": "^4.0.7"
+    "serialport": "^4.0.7",
+    "socket.io-client": "^2.0.3"
   },
   "scripts": {
-    "deploy": "rsync -avzh --exclude-from='./RSYNC_EXCLUDES' ./ markus:/srv/drivers/cctalk-devices && ssh markus scp -r /srv/drivers/cctalk-devices pi@showclient-1:/home/pi",
+    "deploy": "rsync -avzh --exclude-from='./RSYNC_EXCLUDES' ./ markus:/srv/drivers/cctalk-devices && ssh markus DEBUG=* node /srv/peep-server/batch/sync-drivers.js;",
     "start": "node .",
     "debug": "DEBUG=* node ."
   },
