@@ -20,7 +20,7 @@
     "debug": "^3.0.1",
     "defaults-deep": "^0.2.3",
     "feathers-client": "^2.3.0",
-    "promise": "^7.1.1",
+    "promise": "^8.0.1",
     "promise-timeout": "^1.0.0",
     "serialport": "git+https://github.com/direktspeed/node-serialport.git#add_cctalk_parsers",
     "serialport-parsers-cctalk": "git+https://github.com/direktspeed/serialport-parsers-cctalk.git",
