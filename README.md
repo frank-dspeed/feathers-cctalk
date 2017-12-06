@@ -1,6 +1,8 @@
 Node Library to interface coin detectors and other peripheral devices speaking the ccTalk protocol
 ==================================================================================================
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/direktspeed/feathers-cctalk.svg)](https://greenkeeper.io/)
+
 This library aims to provide support for various peripheral devices that use the ccTalk protocol
 over a serial line or serial line emulation over USB. It's primary target is the EMP800 by
 wh Münzprüfer Berlin and Taiko Pub7 BillValidators
