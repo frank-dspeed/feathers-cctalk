@@ -1,6 +1,6 @@
 {
-  "name": "cctalk-devices",
-  "version": "0.1.5",
+  "name": "feathers-cctalk",
+  "version": "0.1.6",
   "description": "Interface coin acceptors and other hardware speaking ccTalk",
   "keywords": [
     "serial",
@@ -29,11 +29,12 @@
   "scripts": {
     "deploy": "rsync -avzh --exclude-from='./RSYNC_EXCLUDES' ./ remote-pc-hostname:/srv/drivers/cctalk-devices && ssh markus DEBUG=* node /srv/peep-server/batch/sync-drivers.js;",
     "start": "node .",
+    "systemctl": "systemctl enable $PWD/ccTalk.service",
     "debug": "DEBUG=* node ."
   },
-  "license": "BSD-2-Clause",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/direktspeed/node-cctalk-devices.git"
+    "url": "https://github.com/direktspeed/feathers-cctalk.git"
   }
 }
