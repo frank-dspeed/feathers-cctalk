@@ -14,9 +14,9 @@ wh Münzprüfer Berlin and Taiko Pub7 BillValidators
 if error post a issue on github
 
 ## TODO
-Since this got last updated we implamented the cctalk protocol directly into node-serialport
+- Since this got last updated we implamented the cctalk protocol directly into node-serialport
 so this can be now refactored to only use lates node-serialport release.
-
+- This should be using beequeue as async jobqueue to stay responsive and be better debug able implamentation is started but not used at present.
 
 API
 ---
