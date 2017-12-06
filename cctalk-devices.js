@@ -1,10 +1,17 @@
 //TODO: Move FUnctions for toCoin Calls into messageHandler to Reduce Debug Output
 const util = require('util');
-const makeDebug = require('debug');
-const config = require('./config');
+const debug = require('debug');
+var config
+try {
+  config = require('./config');
+} catch(e) {
+  config = require('./config.example');
+}
 
-const cctalk = require('./lib/cctalk');
-const CCBus = require('./cctalk-bus');
+function cctalkDebug(msg) {
+  debug('cctalk-devices::debug')(msg)
+  return msg
+}
 
 const WEBSOCKET_SERVER_ADDRESS = config.server;
 const io = require('socket.io-client');
@@ -23,13 +30,9 @@ const jobsService = feathersClient.service('jobs');
 
 const Queue = require('bee-queue');
 
-const cd_queue = new Queue(config.channel+'/cd',config);
-const br_queue = new Queue(config.channel+'/br',config);
-
-
 var Status = {
   config,
-  br: 'offline',
+  bv: 'offline',
   cd: 'offline'
 };
 
@@ -40,7 +43,7 @@ function toCoins(name,DEVICE) {
   var coin;
   coin = name.replace('EU','').replace('00A','');
   coin = parseInt(coin);
-  makeDebug('CCTALK::NOTICE::'+DEVICE)('Transformed',name, coin);
+  debug('cctalk::NOTICE::'+DEVICE)('Transformed',name, coin);
   return coin;
 }
 //const io = require('socket.io-client/dist/socket.io.js');
@@ -49,105 +52,117 @@ function messageHandler(msg) {
   msg.date = new Date().toISOString();
   msg.channel = config.channel;
   MESSAGE = msg;
-  makeDebug('CCTALK::NOTICE::'+msg.status)(MESSAGE);
+  debug('cctalk::NOTICE::'+msg.status)(MESSAGE);
   CCTalkStatusService.create(msg);
 }
 
-if (config.cd) {
-  var cd = new cctalk.CoinDetector(CCBus, { dest: 2 });
 
-  cd.on('error', function(e) {
-    Status.cd = 'error';
-    Status.error = e;
-    messageHandler({ from: 'coindetector', status: 'error', err: e, stack: e.stack });
-  });
 
-  cd.on('accepted', function(coin) {
-    makeDebug('CCTALK::NOTICE::COINDETECTOR')('Accepted',coin);
-    cd.getCoinName(coin).then(function(name) {
-      var amount = toCoins(name,'COINDETECTOR');
-      messageHandler({ from: 'coindetector', status: 'accepted', amount, name, coin });
-    });
-  });
-  cd.on('inhibited', function(coin) {
-    makeDebug('CCTALK::NOTICE::COINDETECTOR')('Inhibited',coin);
-    cd.getCoinName(coin).then(function(name) {
-      var amount = toCoins(name, 'COINDETECTOR');
-      messageHandler({ from: 'coindetector', status: 'inhibited', amount, name, coin });
-      //CCTalkStatusService.create(('INSERTED_COINS', { from: 'coindetector', amount: coin });
-    });
-  });
-  cd.on('rejected', function(coin) {
-    messageHandler({ from: 'coindetector', status: 'rejected', coin });
-  });
 
-  cd.on('ready', function() {
-    Status.cd = 'ready';
-    cd_queue.process(((job,done)=>{
-      return done('Not Implamented', job);
-    }));
-    try {
-      makeDebug('CCTALK')('emp800-ready');
-      cd.enableAcceptance();
-      cd.setAcceptanceMask(0xFFFF);
-      messageHandler({ from: 'coindetector', status: 'ready' });
+const cctalk = require('./lib/cctalk');
+var searchFor = 'wh'
+var SerialPort = require('serialport');
+var CCBus;
+SerialPort.list()
+  .then(cctalkDebug)
+  .then((ports)=>ports.filter((port)=>port.pnpId !== undefined))
+  .then(cctalkDebug)
+  .then((ports)=>ports.filter((port)=>port.pnpId.indexOf(searchFor) > -1))
+  .then(cctalkDebug)
+  .then(ports=>{
+    /*
+    [ { manufacturer: 'wh Berlin',
+        serialNumber: 'whEMP0698323',
+        pnpId: 'usb-wh_Berlin_EMP_8xx.14_whEMP0698323-if00-port0',
+        locationId: undefined,
+        vendorId: '0403',
+        productId: 'EMP 8xx.14',
+        comName: '/dev/ttyUSB0' } ]
+     */
+    if (ports.length > 0) {
+      return ports[0]
+    } else {
+      return Promise.reject('NotFound: '+searchFor)
     }
-    catch(e) {
-      Status.cd = 'error';
-      Status.error = e;
-      makeDebug('CCTALK::ERR::COINDETECTOR')(e);
-      messageHandler({ from: 'coindetector', status: 'error', err: e, stack: e.stack });
+  })
+  .then(cctalkDebug)
+  .then((port)=>{
+    CCBus = require('./cctalk-bus')(port.comName, {autoOpen: false}); // config
+    //TODO: Detect Connected BillValidator
+    //TODO: Send Every 30 sec a SimplePoll for the BV
+
+    return CCBus.ser.open()
+  })
+  .then(cctalkDebug)
+  .then(()=> {
+    cctalkDebug(config)
+    if (config.cd) {
+      var cd = new cctalk.CoinAcceptor(CCBus);
+      const cd_queue = new Queue(config.channel+'/cd',config);
+
+      cd.on('error', function(e) {
+        Status.cd = 'error';
+        Status.error = e;
+        messageHandler({ from: 'coindetector', status: 'error', err: e, stack: e.stack });
+      });
+
+      cd.on('accepted', function(amount) {
+        debug('cctalk::NOTICE::COINDETECTOR')('Accepted',coin);
+        //var amount = toCoins(name,'COINDETECTOR');
+        messageHandler({ from: 'coindetector', status: 'accepted', coin: amount, amount });
+      });
+      cd.on('inhibited', function(coin) {
+        debug('cctalk::NOTICE::COINDETECTOR')('Inhibited',coin);
+        messageHandler({ from: 'coindetector', status: 'inhibited', amount, name, coin });
+      });
+      cd.on('rejected', function() {
+        messageHandler({ from: 'coindetector', status: 'rejected', coin });
+      });
+
+      cd.on('ready', function() {
+        Status.cd = 'ready';
+        cd_queue.process((job,done)=>{
+          return done('Not Implamented', job);
+        });
+      })
+
     }
-  });
-}
 
-if (config.br) {
-  var br = new cctalk.BanknoteReader(CCBus,{ src: 1, dest: 40 });
-  br.on('error', function(e) {
-    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('ERR',e);
-    messageHandler({ from: 'banknotereader', status: 'error', err: e, stack: e.stack });
-  });
+    if (config.bv) {
+      const bv = new cctalk.BillValidator(CCBus,{ dest: 40, crc: 16 });
+      const bv_queue = new Queue(config.channel+'/bv',config);
 
-  br.on('accepted', function(note) {
-    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('Accepted',note);
-    //TODO: Needs Check
-    //br.getNoteName(note).then(function(name) {
-      /*var amount = toCoins(name,'BANKNOTEREADER');
-      switch(note) {
-        case 1:
-        case 2:
+      function startBillValidatorJobs() {
+        bv_queue.process((job,done) => {
+          if (bv.ready){
+            return done('Not Implamented', job);
+          } else {
+            setTimeout(()=>startBillValidatorJobs(),10000)
+            return job.save()
+          }
+        });
       }
-      */
-      messageHandler({ from: 'banknotereader', status: 'accepted', amount, name, note });
-    //});
-  });
-  br.on('inhibited', function(note) {
-    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('Inhibited',note);
-  //  br.getNoteName(note).then(function TransformNameToCoins(name) {
-      //var amount = toCoins(name,'BANKNOTEREADER');
-      messageHandler({ from: 'banknotereader', status: 'inhibited', amount, name, note });
-  //  });
-  });
-  br.on('rejected', function(note) {
-    makeDebug('CCTALK::NOTICE::BANKNOTEREADER')('Rejected',note);
-    messageHandler({ from: 'banknotereader', status: 'rejected', note });
-  });
 
+      //startBillValidatorJobs()
+      bv.on('error', function(e) {
+        debug('cctalk::billvalidator::error')(e);
+        messageHandler({ from: 'BillValidator', status: 'error', err: e, stack: e.stack });
+      });
 
-  br.on('ready', function() {
-    Status.br = 'ready';
-    try {
-      makeDebug('CCTALK')('jmcReady-ready');
-      //br.selfTest();
-      br_queue.process(((job,done)=>{
-        return done('Not Implamented', job);
-      }));
-      br.modifyBillOperatingMode();
-      br.setAcceptanceMask(); // 0xFFFF modifyInhibitStatus 255,255 // 255 1 0 0 0 0 0 0 //TODO: Needs Check  br.setAcceptanceMask(0xFFFF);
-      br.enableAcceptance(); // modifyMasterInhibit 1
+      bv.on('accepted', function(amount) {
+        debug('cctalk::device::events::BillValidator')('Accepted',amount);
+        messageHandler({ from: 'BillValidator', status: 'accepted', amount });
+      });
+
+      bv.on('inhibited', function(channel) {
+        debug('cctalk::NOTICE::BillValidator')('Inhibited',channel);
+        messageHandler({ from: 'BillValidator', status: 'inhibited', amount, name, BillChannel: channel });
+      });
+
+      bv.on('rejected', function() {
+        debug('cctalk::NOTICE::BillValidator')('Rejected');
+        messageHandler({ from: 'BillValidator', status: 'rejected'});
+      });
     }
-    catch(err) {
-      messageHandler({ from: 'banknotereader-trycatch', status: 'error', err, stack: err.stack });
-    }
-  });
-}
+  })
+  .catch(console.log)
