@@ -14,7 +14,7 @@
   "author": "Frank Lemanschik",
   "main": "index.js",
   "dependencies": {
-    "bee-queue": "^1.1.0",
+    "bee-queue": "^1.0.0",
     "cctalk-message": "git+https://github.com/direktspeed/cctalk-message.git#master",
     "class-nonew-decorator": "^1.0.6",
     "debug": "^3.0.1",
