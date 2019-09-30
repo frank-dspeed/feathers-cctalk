@@ -1,6 +1,6 @@
 {
   "name": "feathers-cctalk",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Interface coin acceptors and other hardware speaking ccTalk",
   "keywords": [
     "serial",
@@ -15,7 +15,7 @@
   "main": "index.js",
   "dependencies": {
     "bee-queue": "^1.1.0",
-    "cctalk-message": "git+https://github.com/direktspeed/cctalk-message.git#master",
+    "node-cctalk-command": "git+https://github.com/direktspeed/node-cctalk-command.git#master",
     "class-nonew-decorator": "^1.0.6",
     "debug": "^3.0.1",
     "defaults-deep": "^0.2.3",

@@ -1,3 +1,6 @@
+# Importent
+Please don't use this its not active maintained and gets refactored to use node-cctalk its WIP code from a old project. https://github.com/direktspeed/node-cctalk
+
 Node Library to interface coin detectors and other peripheral devices speaking the ccTalk protocol
 ==================================================================================================
 
