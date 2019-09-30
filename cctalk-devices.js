@@ -59,7 +59,7 @@ function messageHandler(msg) {
 
 
 
-const cctalk = require('./lib/cctalk');
+const cctalk = require('node-cctalk');
 var searchFor = 'wh'
 var SerialPort = require('serialport');
 var CCBus;
@@ -87,7 +87,7 @@ SerialPort.list()
   })
   .then(cctalkDebug)
   .then((port)=>{
-    CCBus = require('./cctalk-bus')(port.comName, {autoOpen: false}); // config
+    CCBus = new cctalk.CCBus(port.comName, {autoOpen: false}); // config
     //TODO: Detect Connected BillValidator
     //TODO: Send Every 30 sec a SimplePoll for the BV
 

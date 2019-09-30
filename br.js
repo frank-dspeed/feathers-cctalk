@@ -8,7 +8,7 @@
   var debug = require('debug');
 
 
-  var cctalk = require('./cctalk');
+  var cctalk = require('node-cctalk');
   var CCBus = new cctalk.CCBus('/dev/ttyUSB1');
   var br = new cctalk.BillReader(CCBus,{ src: 1, dest: 40 });
   br.on('error', function(e) {
