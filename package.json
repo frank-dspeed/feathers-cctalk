@@ -25,7 +25,7 @@
     "promise-timeout": "^1.0.0",
     "serialport": "git+https://github.com/direktspeed/node-serialport.git#add_cctalk_parsers",
     "serialport-parsers-cctalk": "git+https://github.com/direktspeed/serialport-parsers-cctalk.git",
-    "socket.io-client": "^2.0.3"
+    "socket.io-client": "^4.0.0"
   },
   "scripts": {
     "deploy": "rsync -avzh --exclude-from='./RSYNC_EXCLUDES' ./ remote-pc-hostname:/srv/drivers/cctalk-devices && ssh markus DEBUG=* node /srv/peep-server/batch/sync-drivers.js;",
