@@ -1,6 +1,15 @@
+## Most Current CCTALK Lib
+ https://github.com/frank-dspeed/esnext-cctalk/blob/main/src/cctalk.js offers WebStream API and NodeJS Stream API Compatible functional parser. Works also
+ Well in v8::isolates via https://github.com/stealify/stealify and es4x/graaljs projects that are using Javas SerialPort Implementation
+
 # Importent
-Please don't use this its not active maintained and gets refactored to use node-cctalk its WIP code from a old project. https://github.com/frank-dspeed/esnext-cctalk/blob/main/src/cctalk.js and is now only used as Example implamentation Higher Level Implementation like it got done in some hotels.
-and Resorts. There was a need to manage diffrent devices in many diffrent rooms.
+Please don't use this its not active maintained Historical code from a old project. and is now only used as Example Higher Level Implementation like it got done in some hotels. and Resorts. There was a need to manage diffrent devices in many diffrent rooms.
+
+
+
+### Historical Readme
+
+
 
 ## USE
 1. git clone => /srv/drivers/cctalk-devices
@@ -12,8 +21,6 @@ if error post a issue on github
 
 ## TODO
 - This should be using beequeue as async jobqueue to stay responsive and be better debug able implamentation is started but not used at present.
-
-
 
 ## Historical Package.json
 Removed for Security needs
